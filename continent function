@@ -1,0 +1,58 @@
+def cont_list():
+    #imports continent data from website
+    continents_url = "https://simple.wikipedia.org/wiki/List_of_countries_by_continents"
+    from bs4 import BeautifulSoup
+    import requests
+
+    #creates soup object from html code
+    cont_data = requests.get(continents_url).text
+    soup = BeautifulSoup(cont_data, 'html.parser')
+
+    #summons tables from soup object and removes "territories" table
+    cont_tables = soup.find_all('table')
+    del cont_tables[1]
+
+    #Creates title of continents from headings in the soup object and removes headings that arent necessary
+    cont_titles = soup.find_all('h2')
+    cont_titles.pop(0)
+    del cont_titles[-3:]
+
+    #makes output dictionary a global variable so that it can be used by other functions
+    global continents
+    continents = {}
+
+    #Loops through the different soup objects to create dictionary objects, keys are continents, values are lists of countries
+    i = 0
+    for table in cont_tables:
+        title = cont_titles[i].getText()
+        countries = []
+        rows = table.find_all('tr')
+        rows = rows[1:]
+        for row in rows:
+            cols = row.find_all('td')
+            country = cols[2].getText()
+            if '\n' in country:
+                country = country.replace('\n', '')
+            if '[' in country:
+                x = country.find('[')
+                out = country[x:]
+                country = country.replace(out,'')
+            countries.append(country)
+        continents[title] = countries
+        i += 1
+
+    return continents
+
+#This function is used to find the continent of a country that is input
+def count2cont(country):
+
+    #Calls the cont_list function if continents variable is undefined
+    if continents is None:
+        cont_list
+
+    #Returns the continent of the input country
+    for continent in continents.keys():
+        if country in continents[continent]:
+            cont = continent
+    return cont
+
