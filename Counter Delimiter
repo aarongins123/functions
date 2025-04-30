@@ -1,0 +1,34 @@
+#defines a delimiter counter function for data frame to split and count single entries that are delimited within a dataframe.
+#Function requires a dataframe, column name, a delimiter (defaulted to ;) and a descending argument (default is descending == True)
+def DelimitCounter(df, col_name, delimiter = ';', desc = True):
+
+    #This section filters out null values
+    filter_df = df[df[col_name].isnull() == False]
+
+    #Defines a list for items and a counter
+    ITEMS = []
+    counter = []
+
+    #This section splits each entry by the delimiter, and loops through to add the individual entries and count each entry
+    for entry in filter_df[col_name]:
+        items = entry.split(delimiter)
+        for item in items:
+            if item not in ITEMS:
+                ITEMS.append(item)
+                counter.append(1)
+            else:
+                pos = ITEMS.index(item)
+                counter[pos] += 1
+
+    #Reorders the counter and defines a sorted list
+    counter_sort = sorted(counter, reverse=desc)
+    Items_sort = []
+
+    #This section reorders the items list
+    for val in counter_sort:
+        pos = counter.index(val)
+        Items_sort.append(ITEMS[pos])
+
+    # The function returns the sorted items and counter lists
+    return Items_sort, counter_sort
+    
