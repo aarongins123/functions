@@ -1,0 +1,120 @@
+#This function scrapes the results of the premier league 2024/25 season and creates a basic score predictor and power ranking model
+
+def PLScorePredictor25(h_team, a_team):
+    
+    #This section scrapes the PL 24-25 season scores from Wikipedia
+    #if pl_df not in locals():
+    import pandas
+    import requests
+        
+    #Defines wikipedia URL
+    URL = 'https://en.wikipedia.org/wiki/2024%E2%80%9325_Premier_League'
+    tables = pandas.read_html(URL)
+    df = tables[5]
+        
+    #Defines the list of teams in PL in 24-25 season
+    teams = df['Home \\ Away'].to_list()
+        
+    #Defines a dictionary of scores corresponding to each team in the team list
+    Scores = []
+
+    for team in teams:
+        team_scores = df[df['Home \\ Away'] == team]
+        pos = teams.index(team)
+        Home_Scores = {}
+    
+        i = 1
+    
+        while i < 21:
+            if pos + 1 == i:
+                i+=1
+            else:
+                opponent = teams[i-1]
+                score = team_scores.iloc[0][i]
+                Home_Scores[opponent] = score
+                i += 1
+            
+        Scores.append(Home_Scores)
+            
+    #Manipulates data from dictionary into dataframe of scores for each game, with the score strings coverted to integers
+    delimiter = Scores[0]['Aston Villa'][1]
+        
+    Home = []
+    HScore = []
+    Away = []
+    AScore = []
+
+    for team in teams:
+        pos = teams.index(team)
+        scores = Scores[pos]
+        away = scores.keys()
+        for opp in away:
+            Home.append(team)
+            Away.append(opp)
+            score = scores[opp].split(delimiter)
+            HScore.append(int(score[0]))
+            AScore.append(int(score[1]))
+        
+    PL2425 = {'Home Team': Home, 'Home Score': HScore, 'Away Team': Away, 'Away Score': AScore}
+    pl_df = pandas.DataFrame(PL2425)
+    print('Premier League Scores 24-25 season extracted from Wikipedia')
+    
+    
+    #Defines a model for the prediction of premier league scores
+    #if pr_dict not in locals():
+    from sklearn.linear_model import LinearRegression, Ridge
+    import numpy as np
+        
+    #Adds an adjusted score column in comparison to the league mean
+    mean_score = (pl_df['Home Score'].sum() + pl_df['Away Score'].sum())/(len(pl_df)*2)
+    pl_df['Home Scaled'] = pl_df['Home Score'] - mean_score
+    pl_df['Away Scaled'] = pl_df['Away Score'] - mean_score
+        
+    #Creates a sub dataframe upon which a model is created
+    df_sub=pl_df[['Home Team', 'Home Scaled','Away Team', 'Away Scaled']]
+        
+    #Creates an adjusted dataframe which will feed into the model
+    list_home = []
+
+    for i in range(len(df_sub)):
+        entry = {df_sub.loc[i, "Home Team"]+"_Att":1, df_sub.loc[i, "Away Team"] + "_Def": -1, "HFA": 0.5, "Target":df_sub.loc[i, "Home Scaled"]}
+        list_home.append(entry)
+            
+    list_away = []
+
+    for i in range(len(df_sub)):
+        entry = {df_sub.loc[i, "Away Team"]+"_Att":1, df_sub.loc[i, "Home Team"] + "_Def": -1, "HFA": -0.5, "Target":df_sub.loc[i, "Away Scaled"]}
+        list_away.append(entry)
+        
+    #Removes null values from new dataframe
+    df_new = pandas.DataFrame(list_home+list_away)
+    df_new.fillna(0, inplace= True)
+        
+    #Adjsuts column order
+    cols = [t+'_Att' for t in teams]+[t+'_Def' for t in teams]+['HFA','Target']
+    df_new = df_new[cols]
+        
+    #Creates a ridge regression equation that the score predictor is based upon
+    ridge = Ridge(fit_intercept = False, alpha = 0.0001)
+    ridge.fit(df_new.drop('Target',axis=1),df_new['Target'])
+    pr_dict = dict(zip(cols[:-1],ridge.coef_))
+        
+    print('Prediction model generated')
+        
+    if h_team == a_team:
+        print('Home team and away team are the same')
+        
+    elif h_team in teams and a_team in teams:
+        
+        h_team_score = round(pr_dict[h_team+'_Att'] - pr_dict[a_team+'_Def'] + 0.5*pr_dict['HFA'] + mean_score,2)
+        a_team_score = round(pr_dict[a_team+'_Att'] - pr_dict[h_team+'_Def'] - 0.5*pr_dict['HFA'] + mean_score,2)
+        
+        print(h_team,": ", h_team_score, a_team, ": ",a_team_score)
+        return h_team, h_team_score, a_team, a_team_score
+    
+    elif h_team not in teams:
+        print('Home team name has been misspelt or is not in the premier league')
+        
+    elif a_team not in teams:
+        print('Away team name has been misspelt or is not in the premier league')
+    
